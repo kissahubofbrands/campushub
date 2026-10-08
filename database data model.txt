@@ -1,0 +1,204 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  STUDENT
+  FACULTY
+  DEPT_ADMIN
+  SUPER_ADMIN
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  OD
+  LEAVE
+  NOT_MARKED
+}
+
+enum RequestStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum ComplaintStatus {
+  SUBMITTED
+  ASSIGNED
+  UNDER_INVESTIGATION
+  ACTION_TAKEN
+  RESOLVED
+  CLOSED
+}
+
+model User {
+  id           String        @id @default(uuid())
+  email        String        @unique
+  passwordHash String
+  fullName     String
+  role         Role
+  registerNo   String?       @unique
+  departmentId String?
+  hostelRoom   String?
+  busRouteNo   String?
+  createdAt    DateTime      @default(now())
+
+  department   Department?   @relation(fields: [departmentId], references: [id])
+  attendances  Attendance[]  @relation("StudentAttendance")
+  leaves       Leave[]
+  ods          OnDuty[]
+  complaints   Complaint[]
+  requests     ServiceRequest[]
+  auditLogs    AuditLog[]
+}
+
+model Department {
+  id          String       @id @default(uuid())
+  code        String       @unique
+  name        String
+  users       User[]
+  classrooms  Classroom[]
+  courses     Course[]
+  notices     Notice[]
+}
+
+model Classroom {
+  id           String      @id @default(uuid())
+  block        String
+  roomNumber   String
+  capacity     Int
+  departmentId String
+  department   Department  @relation(fields: [departmentId], references: [id])
+  timetables   Timetable[]
+
+  @@unique([block, roomNumber])
+}
+
+model Course {
+  id           String      @id @default(uuid())
+  code         String      @unique
+  title        String
+  departmentId String
+  department   Department  @relation(fields: [departmentId], references: [id])
+  timetables   Timetable[]
+  attendances  Attendance[]
+}
+
+model Timetable {
+  id          String      @id @default(uuid())
+  dayOfWeek   String
+  startTime   String
+  endTime     String
+  courseId    String
+  classroomId String
+  facultyId   String
+  
+  course      Course      @relation(fields: [courseId], references: [id])
+  classroom   Classroom   @relation(fields: [classroomId], references: [id])
+  attendances Attendance[]
+}
+
+model Attendance {
+  id          String           @id @default(uuid())
+  studentId   String
+  courseId    String
+  timetableId String
+  date        String
+  status      AttendanceStatus @default(NOT_MARKED)
+  updatedAt   DateTime         @updatedAt
+
+  student     User             @relation("StudentAttendance", fields: [studentId], references: [id])
+  course      Course           @relation(fields: [courseId], references: [id])
+  timetable   Timetable        @relation(fields: [timetableId], references: [id])
+
+  @@unique([studentId, timetableId, date])
+}
+
+model Leave {
+  id          String        @id @default(uuid())
+  studentId   String
+  startDate   String
+  endDate     String
+  reason      String
+  status      RequestStatus @default(SUBMITTED)
+  appliedAt   DateTime      @default(now())
+
+  student     User          @relation(fields: [studentId], references: [id])
+}
+
+model OnDuty {
+  id               String        @id @default(uuid())
+  studentId        String
+  eventName        String
+  organization     String
+  date             String
+  venue            String
+  documentUrl      String?
+  aiVerification   String?
+  status           RequestStatus @default(SUBMITTED)
+  appliedAt        DateTime      @default(now())
+
+  student          User          @relation(fields: [studentId], references: [id])
+}
+
+model Complaint {
+  id          String          @id @default(uuid())
+  studentId   String
+  category    String
+  location    String
+  description String
+  status      ComplaintStatus @default(SUBMITTED)
+  createdAt   DateTime        @default(now())
+
+  student     User            @relation(fields: [studentId], references: [id])
+}
+
+model ServiceRequest {
+  id          String        @id @default(uuid())
+  ticketId    String        @unique
+  studentId   String
+  type        String
+  details     String
+  status      RequestStatus @default(SUBMITTED)
+  createdAt   DateTime      @default(now())
+
+  student     User          @relation(fields: [studentId], references: [id])
+}
+
+model Notice {
+  id           String      @id @default(uuid())
+  title        String
+  content      String
+  priority     String      @default("NORMAL")
+  departmentId String?
+  publishedAt  DateTime    @default(now())
+
+  department   Department? @relation(fields: [departmentId], references: [id])
+}
+
+model Event {
+  id          String   @id @default(uuid())
+  title       String   @unique
+  category    String
+  date        String
+  venue       String
+  description String
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String
+  action    String
+  details   String
+  timestamp DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id])
+}
